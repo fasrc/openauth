@@ -1,0 +1,320 @@
+<%
+"""
+main page
+
+DESCRIPTION
+	This is the page that informs the user about the process, sends the 
+	continuation link email, and displays the secret key information.  It is 
+	both the initial page and the continuation page -- it takes different 
+	action depending on whether the otec is in the query string.
+
+REQUIREMENTS
+	n/a
+
+AUTHOR
+	John Brunelle <john_brunelle@harvard.edu>
+	Harvard FAS Research Computing
+"""
+
+#original doc from lilpsp:
+"""
+index.psp -- an example webpage
+
+DESCRIPTION
+	This is the template for building webpages.  Any code between pairs of 
+	comments like this:
+
+		#--- BEGIN TEMPLATE CODE...
+		#--- ...END TEMPLATE CODE
+	
+	should not need to be modified.
+
+REQUIREMENTS
+	n/a
+
+AUTHOR
+	John Brunelle <john_brunelle@harvard.edu>
+	Harvard FAS Research Computing
+"""
+
+
+#--- BEGIN TEMPLATE CODE...
+
+class BreakOut(Exception): pass
+
+try:
+	try:
+		from lilpsp import config, core, org
+		import time
+
+		req.add_common_vars()
+		
+		msg = "request from ip [%s] from user [%s]" % (req.subprocess_env['REMOTE_ADDR'], core.getUsername(session, req))
+		core.log(msg, session, req)
+		
+		core.sessionCheck(session, req)
+		
+		base_url_dir = os.path.dirname(req.subprocess_env['SCRIPT_URI'])  #e.g. 'https://SERVER/PATH/'
+		base_fs_dir  = os.path.dirname(req.subprocess_env['SCRIPT_FILENAME'])
+
+		req.write(open(os.path.join(base_fs_dir, 'header.html')).read())
+		wrote_header = True
+
+		#--- ...END TEMPLATE CODE
+		
+
+		from openauth import config2, org2, otec, openauth
+
+		#reset otec defaults; make sure this is in sync with index.psp, else import order will matter
+		otec.OTEC_DIR = os.path.join(config2.ROOT_DIR, 'otec')
+		otec.DEBUG = config.DEBUG
+		
+		base_url = req.subprocess_env['SCRIPT_URI']  #e.g. 'https://SERVER/PATH/'
+		if base_url.endswith('index.psp'): base_url = base_url[:-len('index.psp')]
+
+		username = core.getUsername(session, req)
+		if username is None:
+			raise Exception("internal error: openauth must be behind some compatible authentication wall")
+
+		if config.AUTH_TYPE=='FORM': req.write(org.html_logout_link(session, req))
+
+		if not form.has_key('otec'):
+			try:
+				email = org.getEmailAddress(username)
+			except Exception, e:
+				msg = "failed to get email address for user [%s]: %s" % (username, e)
+				core.log(msg, session, req)
+				req.write(org2.errmsg_no_email(session, req))
+				raise BreakOut()
+			else:
+				lifetime = 60*60*24*1  #seconds
+				expiration = int(time.time()+lifetime)
+				try:
+					code = otec.new(expiration, '%s-' % username)
+					msg = "created otec [%s] for user [%s]" % (code, username)
+					core.log(msg, session, req)
+				except Exception, e:
+					msg = "ERROR: failed to create otec for user [%s]: %s" % (username, e)
+					core.log(msg, session, req, e)
+					req.write(org.errmsg_general(session, req))
+					raise BreakOut()
+				else:
+					url = '%s?otec=%s' % (base_url, code)
+					subject = org2.otec_email_subject(session, req)
+					body = """\
+%s
+
+%s
+
+This link will expire on:
+
+%s
+
+%s
+""" % (org2.otec_email_body_header(session, req), url, time.ctime(expiration), org2.otec_email_body_footer(session, req))
+					try:
+						core.sendEmail(email, subject, body, fromEmailAddress=org.support_email_address)
+					except Exception, e:
+						msg = "ERROR: failed to send otec link email to user [%s] at [%s]: %s" % (username, email, e)
+						core.log(msg, session, req, e)
+						req.write(org.errmsg_general(session, req))
+						raise BreakOut()
+					else:
+						msg = "emailed otec [%s] to [%s] for user [%s]" % (code, email, username)
+						core.log(msg, session, req)
+%>
+						<%=org2.greeting(session, req)%>
+						
+						<%=org2.intro(session, req)%>
+
+						<p>
+						As an added layer of security during this sensitive step, an email has been sent to:
+						</p>
+						<pre>        <%=email%></pre>
+						<p>
+						with the link needed to continue.
+						The link will expire on <%=time.ctime(expiration).replace(' ','&nbsp;')%>.
+						</p>
+						<p>
+						<em>Please wait for that email and follow that link.</em>
+						</p>
+<%
+		else:  #(form.has_key('otec'))
+			code = str(form['otec'])
+			if not otec.isValid(code) or not code.startswith(username):
+				#(it may not even exist)
+				msg = "expired, invalid, or unprovided otec for user [%s]: %s" % (username, code)
+				core.log(msg, session, req)
+				req.write(org2.errmsg_bad_otec(session, req))
+				raise BreakOut()
+			
+			msg = "accepted otec [%s] for user [%s]" % (code, username)
+			core.log(msg, session, req)
+
+			new_secret = True  #(maybe)
+			if not openauth.secretFileExists(username):
+				msg = "no secret found for user [%s], making one" % username
+				core.log(msg, session, req)
+				try:
+					openauth.makeSecretFile(username)
+				except Exception, e:
+					msg = "ERROR: failed to make secret file for user [%s]: %s" % (username, e)
+					core.log(msg, session, req, e)
+					req.write(org.errmsg_general(session, req))
+					raise BreakOut()
+			else:
+				new_secret = False
+				msg = "using existing secret for user [%s]" % username
+				core.log(msg, session, req)
+
+			try:
+				lifetime = 120  #seconds (this otec is for an image included in this page, it's lifetime should only be the maximum amount of time it might take to load this page)
+				expiration = int(time.time()+lifetime)
+				code_qr  = otec.new(expiration, '%s-qr-' % username)
+				msg = "created otec for qrcode.png [%s] for user [%s]" % (code_qr, username)
+				core.log(msg, session, req)
+			except Exception, e:
+				msg = "ERROR: failed to create otec for qrcode.png for user [%s]: %s" % (username, e)
+				core.log(msg, session, req, e)
+				req.write(org.errmsg_general(session, req))
+				raise BreakOut()
+			try:
+				lifetime = 60*30  #seconds (this otec is for the zip file download, so needs to be long enough for the user to read the page and decide to download it)
+				expiration = int(time.time()+lifetime)
+				code_oa = otec.new(expiration, '%s-oa-' % username)
+				msg = "created otec for zip file [%s] for user [%s]" % (code_oa, username)
+				core.log(msg, session, req)
+			except Exception, e:
+				msg = "ERROR: failed to create otec for zip file for user [%s]: %s" % (username, e)
+				core.log(msg, session, req, e)
+				req.write(org.errmsg_general(session, req))
+				raise BreakOut()
+			#end indent
+%>
+			<%=org2.greeting(session, req)%>
+<%
+			if new_secret:
+%>
+				<p>
+				A new openauth secret key has been generated for your account.
+				You now must load your mobile device with this secret key or download a customized desktop application that contains this secret key.
+<%
+			else:
+%>
+				<p>
+				You already have an openauth secret key associated with your account.
+				The information below lets you configure another device to use this key without stopping your previous devices from working.
+				If you have lost or insecurely handled the device on which you have had your secret key, or otherwise wish to create a new secret key, go to <a href="<%=os.path.join(base_url,'revoke')%>"><%=os.path.join(base_url,'revoke')%></a> to revoke your secret key.
+<%
+			#end indent
+%>
+			</p>
+			<br /><!--(because our paragraph margin-* css is off; remove on other sites)-->
+			<p>
+			Please pick the most convenient method for you below.
+			</p>
+			<p>
+			<em>When finished, close your browser in order to fully log out of this site.</em>
+			</p>
+
+			<h3>Mobile Device with Camera</h3>
+			<ol>
+				<li>
+					Download the Google-Authenticator app from the <a href="http://itunes.apple.com/us/app/google-authenticator/id388497605?mt=8">Apple App Store</a> or <a href="https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2">Google Play</a>.
+				</li>
+				<li>
+					Open the app, tap the button to add an account or the + symbol to add a key, and tap the button to scan in the code rather than enter it manually.
+					You may be prompted to install a QR code reader such as ZXing scanner; do this.
+				</li>
+				<li>
+					Point your device's camera at the following QR code:
+					<br />
+					<img src="qrcode.png?otec=<%=code_qr%>" />
+				</li>
+			</ol>
+
+			<h3>Desktop Application</h3>
+			<ul>
+				<p>
+				The desktop application requires <code>java</code>, which you can get at <a href="http://www.java.com/">http://www.java.com/</a> or through your system's software package manager.
+				You must have version 1.6 or newer.
+				</p>
+				<br /><!--(because our paragraph margin-* css is off; remove on other sites)-->
+				<p>
+				Download <a href="<%=username%>-openauth.zip?otec=<%=code_oa%>"><%=username%>-openauth.zip</a> and unzip it in a convenient location that you will be able to find later.
+				There is nothing to install &mdash; each time you need to launch the application, just double-click <code>JAuth.jar</code>.
+				If you prefer launching from the command-line, there are also the scripts <code><%=username%>-openauth.sh</code> (if you use a Mac or Linux) and <code><%=username%>-openauth.bat</code> (if you use Windows).
+				</p>
+				<br /><!--(because our paragraph margin-* css is off; remove on other sites)-->
+				<p>
+				If you prefer a more conventional installation program, you can use <a href="JAuth_windows_1_0.exe">JAuth_windows_1_0.exe</a> (for Windows), <a href="JAuth_macos_1_0.dmg">JAuth_macos_1_0.dmg</a> (for Mac), or <a href="JAuth_unix_1_0.sh">JAuth_unix_1_0.sh</a> (for Linux) instead of downloading the above zip file.
+				However, you will have to enter your secret key manually; see below.
+				</p>
+				<br /><!--(because our paragraph margin-* css is off; remove on other sites)-->
+				<p>
+				Note that openauth uses a time-based algorithm.
+				<em>Your computer's clock must be in sync with official time</em> in order for this to work consistently.
+				<%=org2.extra_info_on_time_skew(session, req)%>
+				</p>
+				<br /><!--(because our paragraph margin-* css is off; remove on other sites)-->
+				<p>
+				This application is specifically customized to your identity and contains a secret key only you should have.
+				Do <em>NOT</em> share it with anyone else.
+				<!-- If you lose this file, you can get it again by coming back to <a href="<%=base_url%>"><%=base_url%></a> and going through the same email verification process. -->
+				</p>
+			</ul>
+
+			<h3>Other</h3>
+			<ul>
+				<p>
+				If you have an iOS or Android device without a camera, have a broken camera, are using the alternative installers above, or have some other client that implements <a href="http://tools.ietf.org/html/rfc6238">TOTP</a>, you will need to enter your secret key manually.
+				Your secret key is:
+				</p>
+				<br /><!--(because our paragraph margin-* css is off; remove on other sites)-->
+				<p>
+				<code><%=openauth.getSecret(username)%></code>
+				</p>
+				<br /><!--(because our paragraph margin-* css is off; remove on other sites)-->
+				<p>
+				Treat this string as carefully as you would your normal password.
+				</p>
+			</ul>
+			
+			<br />
+			<%=org2.outro(session, req)%>
+<%
+			try:
+				otec.delete(code)
+				msg = "deleted otec [%s] for user [%s]" % (code, username)
+				core.log(msg, session, req)
+			except Exception, e:
+				msg = "ERROR: failed to delete otec [%s] for user [%s]: %s" % (code, username, e)
+				core.log(msg, session, req, e)
+				pass  #everything else worked, and the user is good to go; the otec will expire anyways
+			msg = "SUCCESS for user [%s]" % username
+			core.log(msg, session, req)
+
+
+	#--- BEGIN TEMPLATE CODE...
+		
+	except BreakOut:
+		pass
+	
+	req.write(open(os.path.join(base_fs_dir, 'footer.html')).read())
+	wrote_footer = True
+except apache.SERVER_RETURN:
+	##if it's re-raised, sessions start over; passing seems wrong but it's the only way I know of to make sessions persist across redirect
+	#raise
+	pass
+except Exception, e:
+	if not ( 'core' in globals() and 'org' in globals() ):
+		raise  #just bailout and let the server handle it (if configured with PythonDebug On, the traceback will be shown to the user)
+	else:
+		msg = "ERROR: uncaught exception when handling user [%s]: %s" % (core.getUsername(session, req), e)
+		core.log(msg, session, req, e)
+		if not 'wrote_header' in globals() and 'base_fs_dir' in globals(): req.write(open(os.path.join(base_fs_dir, 'header.html')).read())
+		req.write(org.errmsg_general(session, req))
+		if not 'wrote_footer' in globals() and 'base_fs_dir' in globals(): req.write(open(os.path.join(base_fs_dir, 'footer.html')).read())
+
+#--- ...END TEMPLATE CODE
+%>

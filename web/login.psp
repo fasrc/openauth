@@ -1,0 +1,174 @@
+<%
+"""
+login page used when config.AUTH_TYPE=='FORM'
+
+DESCRIPTION
+	When config.AUTH_TYPE=='FORM', unauthenticated requests are redirected to this page.
+	This serves as a logout page, too (visiting this page while logged in will automatically log the user out).
+	See the README for more detail.
+
+	This page is based off of the index.psp, and those blocks of code should be synced.
+
+REQUIREMENTS
+	n/a
+
+AUTHOR
+	John Brunelle <john_brunelle@harvard.edu>
+	Harvard FAS Research Computing
+"""
+
+
+#--- BEGIN TEMPLATE CODE...
+
+class BreakOut(Exception): pass
+
+try:
+	try:
+		from lilpsp import config, core, org
+		import os, urllib
+		
+		req.add_common_vars()
+		
+		msg = "request from ip [%s] from user [%s]" % (req.subprocess_env['REMOTE_ADDR'], core.getUsername(session, req))
+		core.log(msg, session, req)
+		
+		base_url_dir = os.path.dirname(req.subprocess_env['SCRIPT_URI'])  #e.g. 'https://SERVER/PATH/'
+		base_fs_dir  = os.path.dirname(req.subprocess_env['SCRIPT_FILENAME'])
+
+		#--- ...END TEMPLATE CODE
+
+		
+		#--- sanity check
+
+		if config.AUTH_TYPE!='FORM':
+			raise Exception("internal error: request to login.psp when config.AUTH_TYPE!='FORM'")
+
+
+		#--- begin handling posts to self (or prep for form)
+	
+		logged_in = False
+		logged_out = False
+		login_failed = False
+
+		#handle posts to self (the actual user authentication step)
+		if req.headers_in.has_key('Referer') and req.headers_in['Referer'].split('?')[0]==req.subprocess_env['SCRIPT_URI']:
+			if form.has_key('username') and form.has_key('password'):
+				username = str(form['username']).strip()
+				password = str(form['password']).strip()
+
+				try:
+					if username=='': raise Exception("username cannot be empty")
+					if password=='': raise Exception("password cannot be empty")
+					org.authenticateUser(session, req, username, password)
+				except Exception, e:
+					session.invalidate()  #(this is done below, too)
+					session.delete()
+					login_failed = True
+					msg = "autentication of user [%s] failed" % username  #the error message is purposefully not here, so as to not leak information...
+					core.log(msg, session, req, e)  #...if config.DEBUG is set, the full error will be logged
+				else:
+					session['username'] = username
+					logged_in = True
+					msg = "authenticated user [%s]" % username  #(session id will be logged automatically)
+					core.log(msg, session, req)
+
+					if form.has_key('redirect'):
+						try:
+							util.redirect(req, urllib.unquote_plus(str(form['redirect'])))
+						except apache.SERVER_RETURN:  #fix for pre-3.3.1 bug where it uses apache.OK instead of apache.DONE (https://issues.apache.org/jira/browse/MODPYTHON-140)
+							raise apache.SERVER_RETURN, apache.DONE
+		
+		#if visiting this page while already logged in, logout
+		if not logged_in and core.getUsername(session, req) is not None:
+			session.invalidate()  #(this is done below, too)
+			session.delete()
+			logged_out = True
+
+
+		#--- begin page construction
+		
+		req.write(open(os.path.join(base_fs_dir, 'header.html')).read())
+		wrote_header = True
+		
+		if logged_in:
+			#(if code gets here, it means there was no redirect to follow)
+			req.write(org.html_login_successful(session, req))
+		else:
+			session.invalidate()  #want to start with a brand new session (so this one is invalidated, and the one created above, upon submission will be the good one)
+			session.delete()
+			msg = "invalidated this session"
+			core.log(msg, session, req)
+			
+			if logged_out:
+				req.write(org.html_logout_successful(session, req))
+			if login_failed:
+				req.write(org.html_login_failed(session, req))
+
+			req.write(org.html_login_intro(session, req))
+%>
+			<p>
+			<form method="post" action="login.psp">
+				<table>
+					<tr>
+						<td style="text-align:right;">
+							username:
+						</td>
+						<td>
+							<input type="text" name="username" /><br />
+						</td>
+					</tr>
+					<tr>
+						<td style="text-align:right;">
+							password:
+						</td>
+						<td>
+							<input type="password" name="password" /><br />
+						</td>
+					</tr>
+					<tr>
+						<td>
+							&nbsp;
+						</td>
+						<td>
+							<input type="submit" value="Login" />
+						</td>
+					</tr>
+<%
+			if form.has_key('redirect'):
+				#begin indent
+%>
+				<input type="hidden" name="redirect" value="<%=str(form['redirect'])%>" />
+<%
+			#end indent
+%>
+				</table>
+			</form>
+			</p>
+<%
+			req.write(org.html_login_outro(session, req))
+		#end indent
+
+
+		#--- BEGIN TEMPLATE CODE...
+
+	except BreakOut:
+		pass
+	
+	req.write(open(os.path.join(base_fs_dir, 'footer.html')).read())
+	wrote_footer = True
+except apache.SERVER_RETURN:
+	##if it's re-raised, sessions start over; passing seems wrong but it's the only way I know of to make sessions persist across redirect
+	#raise
+	pass
+except Exception, e:
+	if not ( 'core' in globals() and 'org' in globals() ):
+		raise  #just bailout and let the server handle it (if configured with PythonDebug On, the traceback will be shown to the user)
+	else:
+		msg = "ERROR: uncaught exception when handling user [%s]: %s" % (core.getUsername(session, req), e)
+		core.log(msg, session, req, e)
+		if not 'wrote_header' in globals() and 'base_fs_dir' in globals(): req.write(open(os.path.join(base_fs_dir, 'header.html')).read())
+		req.write(org.errmsg_general(session, req))
+		if not 'wrote_footer' in globals() and 'base_fs_dir' in globals(): req.write(open(os.path.join(base_fs_dir, 'footer.html')).read())
+
+#--- ...END TEMPLATE CODE
+%>

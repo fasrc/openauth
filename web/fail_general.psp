@@ -1,0 +1,59 @@
+<%
+"""
+deal with general failure for non-html content
+
+DESCRIPTION
+	Provide a page to use when the zip download or qrcode fails.  Other pages 
+	handle errors self-sufficently, but the file downloads, not being 
+	Content-Type:text/html, need this.
+
+REQUIREMENTS
+	n/a
+
+AUTHOR
+	John Brunelle <john_brunelle@harvard.edu>
+	Harvard FAS Research Computing
+"""
+
+
+#--- BEGIN TEMPLATE CODE...
+
+try:
+	from lilpsp import core
+	req.add_common_vars()
+	msg = "request from ip [%s] from user [%s]" % (req.subprocess_env['REMOTE_ADDR'], core.getUsername(session, req))
+	core.log(msg, session, req)
+except apache.SERVER_RETURN:
+	##if it's re-raised, sessions start over; passing seems wrong but it's the only way I know of to make sessions persist across redirect
+	#raise
+	pass
+except Exception:
+	pass
+#end indent
+%>
+<%@ include file="header.html" %>
+<%
+try:
+	#--- ...END TEMPLATE CODE
+
+
+	from lilpsp import config, org
+	if config.AUTH_TYPE=='FORM': req.write(org.html_logout_link(session, req))
+	req.write(org.errmsg_general(session, req))
+
+
+	#--- BEGIN TEMPLATE CODE...
+
+except apache.SERVER_RETURN:
+	##if it's re-raised, sessions start over; passing seems wrong but it's the only way I know of to make sessions persist across redirect
+	#raise
+	pass
+except Exception:
+	req.write("<h3>ERROR</h3>")
+#end indent
+%>
+<%@ include file="footer.html" %>
+<%
+
+#--- ...END TEMPLATE CODE
+%>

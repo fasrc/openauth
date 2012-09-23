@@ -1,0 +1,117 @@
+<%
+"""
+deal with openauth secret revocation
+
+DESCRIPTION
+	This page handles both warning the user and doing the actual deletion -- it 
+	takes different action depending on whether the presence/value of "confirm" 
+	in the query string.
+
+REQUIREMENTS
+	n/a
+
+AUTHOR
+	John Brunelle <john_brunelle@harvard.edu>
+	Harvard FAS Research Computing
+"""
+
+
+#--- BEGIN TEMPLATE CODE...
+
+class BreakOut(Exception): pass
+
+try:
+	try:
+		from lilpsp import config, core, org
+
+		req.add_common_vars()
+		
+		msg = "request from ip [%s] from user [%s]" % (req.subprocess_env['REMOTE_ADDR'], core.getUsername(session, req))
+		core.log(msg, session, req)
+		
+		core.sessionCheck(session, req)
+		
+		base_url_dir = os.path.dirname(req.subprocess_env['SCRIPT_URI'])  #e.g. 'https://SERVER/PATH/'
+		base_fs_dir  = os.path.dirname(req.subprocess_env['SCRIPT_FILENAME'])
+
+		req.write(open(os.path.join(base_fs_dir, 'header.html')).read())
+		wrote_header = True
+
+		#--- ...END TEMPLATE CODE
+
+
+		from openauth import org2, openauth
+
+		username = core.getUsername(session, req)
+		if username is None:
+			raise Exception("internal error: openauth must be behind some compatible authentication wall")
+
+		if config.AUTH_TYPE=='FORM': req.write(org.html_logout_link(session, req))
+
+		req.write(org2.greeting(session, req))
+	
+		if not openauth.secretFileExists(username):
+			msg = "user [%s] tried to revoke but there is no secret to revoke" % username 
+			core.log(msg, session, req)
+%>
+			<p>
+			There are already no openauth credentials associated with your account.
+			</p>
+<%
+		else:
+			if not (form.has_key('confirm') and form['confirm'].startswith('n')):
+%>
+				<h1><span style='color:red;'>WARNING</span></h1>
+				<p>
+				By continuing this process, you will permanently delete your current openauth credentials.
+				All devices you have will have to be reconfigured in order to work again using this self-service website.
+				</p>
+				<p>
+				Click <a href="revoke.psp?confirm=n">here</a> to continue.
+				</p>
+<%
+				msg = "warned user [%s] about permanently deleting credentials" % username 
+				core.log(msg, session, req)
+			else:
+				try:
+					openauth.deleteSecretFile(username)
+					msg = "revoked secret for user [%s]" % username 
+					core.log(msg, session, req)
+%>
+					<p>
+					All of your existing openauth credentials have been deleted.
+					</p>
+					<p>
+					Click <a href="<%=base_url_dir%>"><%=base_url_dir%></a> if you wish to create new ones.
+					</p>
+<%
+				except Exception, e:
+					msg = "ERROR: unable to revoke secret for user [%s]: %s" % (username, e)
+					core.log(msg, session, req, e)
+					req.write(org.errmsg_general(session, req))
+					raise BreakOut()
+
+
+		#--- BEGIN TEMPLATE CODE...
+		
+	except BreakOut:
+		pass
+	
+	req.write(open(os.path.join(base_fs_dir, 'footer.html')).read())
+	wrote_footer = True
+except apache.SERVER_RETURN:
+	##if it's re-raised, sessions start over; passing seems wrong but it's the only way I know of to make sessions persist across redirect
+	#raise
+	pass
+except Exception, e:
+	if not ( 'core' in globals() and 'org' in globals() ):
+		raise  #just bailout and let the server handle it (if configured with PythonDebug On, the traceback will be shown to the user)
+	else:
+		msg = "ERROR: uncaught exception when handling user [%s]: %s" % (core.getUsername(session, req), e)
+		core.log(msg, session, req, e)
+		if not 'wrote_header' in globals() and 'base_fs_dir' in globals(): req.write(open(os.path.join(base_fs_dir, 'header.html')).read())
+		req.write(org.errmsg_general(session, req))
+		if not 'wrote_footer' in globals() and 'base_fs_dir' in globals(): req.write(open(os.path.join(base_fs_dir, 'footer.html')).read())
+
+#--- ...END TEMPLATE CODE
+%>
