@@ -161,7 +161,7 @@ def authenticateUser(session, req, username, password):
 					authenticated = True
 					break
 				except ldap.SERVER_DOWN, e:
-					msg = "gotasdf ldap.SERVER_DOWN for [%s]: %s; will retry other hosts if available" % (host, e)
+					msg = "got ldap.SERVER_DOWN for [%s]: %s; will retry other hosts if available" % (host, e)
 					core.log(msg, session, req)
 					continue
 			if not authenticated: raise Exception("cannot contact LDAP server(s)")

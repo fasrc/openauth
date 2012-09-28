@@ -18,7 +18,7 @@ AUTHOR
 import os
 
 #common parent directory for pretty much everything
-ROOT_DIR = '/n/openauth2'
+ROOT_DIR = '/n/openauth'
 
 #directory containing the google-authenticator binary
 #this is prepended to PATH; set it to None if already in the PATH

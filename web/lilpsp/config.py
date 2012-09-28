@@ -23,7 +23,7 @@ import os, re
 #take the name of the directory containing all the psp, html, and the python 
 #package, and use that as the name of the log file.
 #LOG_FILE = '/var/log/httpd/%s.log' % os.path.basename(os.path.normpath(os.path.join(os.path.dirname(__file__),'..')))
-LOG_FILE = '/n/openauth2/log/web.log'
+LOG_FILE = '/n/openauth/log/web.log'
 
 #DEBUG -- boolean for whether or not to include full details in Exceptions and log messages
 #WARNING: True may cause tracebacks, shell command output, and other secrets to 
