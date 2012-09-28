@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+
+#
+# This is a hack to alleviate an issue that hadir has.  If you're not using 
+# hadir, this is not applicable.
+#
+# If a hung rsync is killed or otherwise fails, it may have written data but 
+# not set metadata.  Also, there is a race condition during failover that may 
+# leave behind the temporary s~ file, and that's a problem.  This script cleans 
+# these things up.  Each new failure mode, we add it here.  What a hack.
+# 
+# This is meant to be run from cron.  By design, it uses set -x around actions 
+# it takes to echo commands to stderr and trigger cron to therefore send an 
+# email of what this did.
+#
+# John Brunelle
+# Harvard FAS Research Computing
+#
+
+oaroot=/n/openauth  #CHANGEME
+
+prefix=''  #set to 'echo' to just print commands, '' to run for real
+
+
+#---
+
+
+rootd="$oaroot"/secrets/default
+
+#don't let multiple copies of this script run at the same time
+if [ "$(ps ax -o 'pgid command' | grep '[b]ash.*'"$(basename $0)" | grep -v ^"$(ps -o pgid= -p $$)"'\>' | wc -l)" -gt 0 ]; then
+	echo "*** ERROR *** $(basename "$0"): another instance of this script is already running" >&2
+	exit 1
+fi
+
+#look for pam_google_authenticator tmp files not deleted
+while read x; do
+	#don't delete it unless it's old!  otherwise it may be a proper file
+	if [ $(( $(date +%s) -  $(stat -c%Y "$x") )) -gt 60 ]; then
+		set -x
+		$prefix rm "$x"
+		set +x
+	fi
+done < <(find "$rootd" -mindepth 1 -type f -name 's~')
+
+#check all directory metadata
+while read x; do
+	if [ "$(stat -c%U:%G "$x")" != 'apache:apache' ]; then
+		set -x
+		$prefix chown apache:apache "$x"
+		set +x
+	fi
+	if [ "$(stat -c%a "$x")" != '770' ]; then
+		set -x
+		$prefix chmod 770 "$x"
+		set +x
+	fi
+done < <(find "$rootd" -mindepth 1 -type d)
+
+#check all file metadata
+while read x; do
+	if [ "$(stat -c%U:%G "$x")" != 'apache:apache' ]; then
+		set -x
+		$prefix chown apache:apache "$x"
+		set +x
+	fi
+	if [ "$(stat -c%a "$x")" != '400' ]; then
+		set -x
+		$prefix chmod 400 "$x"
+		set +x
+	fi
+done < <(find "$rootd" -mindepth 1 -type f)
