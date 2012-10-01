@@ -129,15 +129,15 @@ def getZipBytes(username):
 		sh = "rsync -a %s/ %s/" % (core.shQuote(config2.ZIP_CONTENTS_DIR), core.shQuote(zipdpath))
 		core.getStdout(sh)
 		
-		f = open(os.path.join(zipdpath, 'AuthenticatorGUI.class'),'r')
+		f = open(os.path.join(zipdpath, 'JAuth', 'AuthenticatorGUI.class'),'r')
 		classbytes = f.read()
 		f.close()
 		classbytes = classbytes.replace(config2.SECRET_PLACEHOLDER, getSecret(username),1)
-		f = open(os.path.join(zipdpath, 'AuthenticatorGUI.class'),'w')
+		f = open(os.path.join(zipdpath, 'JAuth', 'AuthenticatorGUI.class'),'w')
 		f.write(classbytes)
 		f.close()
 
-		sh = "cd %s && jar uf JAuth.jar AuthenticatorGUI.class && rm AuthenticatorGUI.class" % core.shQuote(zipdpath)
+		sh = "cd %s && jar uf JAuth.jar JAuth/AuthenticatorGUI.class && rm JAuth/AuthenticatorGUI.class" % core.shQuote(zipdpath)
 		core.getStdout(sh)
 		sh = "cd %s && mv openauth.sh %s-openauth.sh && mv openauth.bat %s-openauth.bat && cd .. && zip -r %s.zip %s" % (core.shQuote(zipdpath), core.shQuote(username), core.shQuote(username), core.shQuote(zipdbasename), core.shQuote(zipdbasename))
 		core.getStdout(sh)
@@ -247,12 +247,12 @@ def downloadHandler(req):
 		#raise
 		pass
 	except Exception, e:
-		if not ( 'session' in globals() and 'core' in globals() and 'base_url_dir' in globals() ):
+		if not ( 'core' in globals() and 'session' in locals() and 'base_url_dir' in locals() ):
 			raise  #just bailout and let the server handle it (if configured with PythonDebug On, the traceback will be shown to the user)
 		else:
 			msg = "ERROR: uncaught exception when handling user [%s]: %s" % (core.getUsername(session, req), e)
 			core.log(msg, session, req, e)
-			req.internal_redirect(os.path.join(base_url_dir, '..', 'fail_general.psp'))
+			req.internal_redirect(os.path.join(base_url_dir, 'fail_general.psp'))
 			return apache.OK  #(not sure if this does anything)
 	
 	#--- ...END TEMPLATE CODE
