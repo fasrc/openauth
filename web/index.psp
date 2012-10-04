@@ -234,51 +234,56 @@ This link will expire on:
 			</ol>
 
 			<h3>Desktop Application</h3>
+			<p>
+			The desktop application requires <code>java</code>, which you can get at <a href="http://www.java.com/">http://www.java.com/</a> or through your system's software package manager.
+			You must have version 1.6 or newer.
+			</p>
+			<br /><!--(because our paragraph margin-* css is off; remove on other sites)-->
+			<p>
+			Download <a href="<%=username%>-openauth.zip?otec=<%=code_oa%>"><%=username%>-openauth.zip</a> and unzip it in a convenient location that you will be able to find later.
+			There is nothing to install &mdash; each time you need to launch the application, just double-click <code>JAuth.jar</code>.
+			If you prefer launching from the command-line, there are also the scripts <code><%=username%>-openauth.sh</code> (if you use a Mac or Linux) and <code><%=username%>-openauth.bat</code> (if you use Windows).
+			</p>
+			<br /><!--(because our paragraph margin-* css is off; remove on other sites)-->
+			<p>
+			If you prefer a more conventional installation program, you can use <a href="JAuth_windows_1_0.exe">JAuth_windows_1_0.exe</a> (for Windows), <a href="JAuth_macos_1_0.dmg">JAuth_macos_1_0.dmg</a> (for Mac), or <a href="JAuth_unix_1_0.sh">JAuth_unix_1_0.sh</a> (for Linux) instead of downloading the above zip file.
+			<em>However, you will have to enter your secret key manually</em>; see below.
+			Also, Mac OSX 10.8 Mountain Lion users may receive a message saying the app cannot be opened, as it's from an unknown developer.
+			In that case you will need to open the app differently the first time you run it:
+			</p>
 			<ul>
-				<p>
-				The desktop application requires <code>java</code>, which you can get at <a href="http://www.java.com/">http://www.java.com/</a> or through your system's software package manager.
-				You must have version 1.6 or newer.
-				</p>
-				<br /><!--(because our paragraph margin-* css is off; remove on other sites)-->
-				<p>
-				Download <a href="<%=username%>-openauth.zip?otec=<%=code_oa%>"><%=username%>-openauth.zip</a> and unzip it in a convenient location that you will be able to find later.
-				There is nothing to install &mdash; each time you need to launch the application, just double-click <code>JAuth.jar</code>.
-				If you prefer launching from the command-line, there are also the scripts <code><%=username%>-openauth.sh</code> (if you use a Mac or Linux) and <code><%=username%>-openauth.bat</code> (if you use Windows).
-				</p>
-				<br /><!--(because our paragraph margin-* css is off; remove on other sites)-->
-				<p>
-				If you prefer a more conventional installation program, you can use <a href="JAuth_windows_1_0.exe">JAuth_windows_1_0.exe</a> (for Windows), <a href="JAuth_macos_1_0.dmg">JAuth_macos_1_0.dmg</a> (for Mac), or <a href="JAuth_unix_1_0.sh">JAuth_unix_1_0.sh</a> (for Linux) instead of downloading the above zip file.
-				However, you will have to enter your secret key manually; see below.
-				</p>
-				<br /><!--(because our paragraph margin-* css is off; remove on other sites)-->
-				<p>
-				Note that openauth uses a time-based algorithm.
-				<em>Your computer's clock must be in sync with official time</em> in order for this to work consistently.
-				<%=org2.extra_info_on_time_skew(session, req)%>
-				</p>
-				<br /><!--(because our paragraph margin-* css is off; remove on other sites)-->
-				<p>
-				This application is specifically customized to your identity and contains a secret key only you should have.
-				Do <em>NOT</em> share it with anyone else.
-				<!-- If you lose this file, you can get it again by coming back to <a href="<%=base_url%>"><%=base_url%></a> and going through the same email verification process. -->
-				</p>
+				<li>Hold down <em>Control</em> and click on the app icon</li>
+				<li>From the popup menu, select <em>Open</em></li>
+				<li>Another message will appear asking if you're sure</li>
+				<li>Click the <em>Open</em> button to continue and open the app</li>
+				<li>From here on, the app will be allowed to open normally</li>
 			</ul>
+			<br /><!--(because our paragraph margin-* css is off; remove on other sites)-->
+			<p>
+			Note that openauth uses a time-based algorithm.
+			<em>Your computer's clock must be in sync with official time</em> in order for this to work consistently.
+			<%=org2.extra_info_on_time_skew(session, req)%>
+			</p>
+			<br /><!--(because our paragraph margin-* css is off; remove on other sites)-->
+			<p>
+			This application is specifically customized to your identity and contains a secret key only you should have.
+			Do <em>NOT</em> share it with anyone else.
+			<!-- If you lose this file, you can get it again by coming back to <a href="<%=base_url%>"><%=base_url%></a> and going through the same email verification process. -->
+			</p>
 
 			<h3>Other</h3>
-			<ul>
-				<p>
-				If you have an iOS or Android device without a camera, have a broken camera, are using the alternative installers above, or have some other client that implements <a href="http://tools.ietf.org/html/rfc6238">TOTP</a>, you will need to enter your secret key manually.
-				Your secret key is:
-				</p>
-				<br /><!--(because our paragraph margin-* css is off; remove on other sites)-->
-				<p>
-				<code><%=openauth.getSecret(username)%></code>
-				</p>
-				<br /><!--(because our paragraph margin-* css is off; remove on other sites)-->
-				<p>
-				Treat this string as carefully as you would your normal password.
-				</p>
-			</ul>
+			<p>
+			If you have an iOS or Android device without a camera, have a broken camera, are using the alternative installers above, or have some other client that implements <a href="http://tools.ietf.org/html/rfc6238">TOTP</a>, you will need to enter your secret key manually.
+			Your secret key is:
+			</p>
+			<br /><!--(because our paragraph margin-* css is off; remove on other sites)-->
+			<p>
+			<code><%=openauth.getSecret(username)%></code>
+			</p>
+			<br /><!--(because our paragraph margin-* css is off; remove on other sites)-->
+			<p>
+			Treat this string as carefully as you would your normal password.
+			</p>
 			
 			<br />
 			<%=org2.outro(session, req)%>
