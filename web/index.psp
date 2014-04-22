@@ -247,8 +247,10 @@ This link will expire on:
 			<br /><!--(because our paragraph margin-* css is off; remove on other sites)-->
 			<p>
 			If you prefer a more conventional installation program, you can use <a href="JAuth_windows_1_0.exe">JAuth_windows_1_0.exe</a> (for Windows), <a href="JAuth_macos_1_0.dmg">JAuth_macos_1_0.dmg</a> (for Mac), or <a href="JAuth_unix_1_0.sh">JAuth_unix_1_0.sh</a> (for Linux) instead of downloading the above zip file.
-			<em>However, you will have to enter your secret key manually</em>; see below.
-			Also, Mac OSX 10.8 Mountain Lion users may receive a message saying the app cannot be opened, as it's from an unknown developer.
+			<em>However, you will have to enter your secret key manually</em> &mdash; your secret key is <code><%=oa.getSecret(username)%></code>.
+			</p>
+			<p>
+			Also, with the gui installer, Mac OSX 10.8 Mountain Lion users may receive a message saying the app cannot be opened, as it's from an unknown developer.
 			In that case you will need to open the app differently the first time you run it:
 			</p>
 			<ul>
